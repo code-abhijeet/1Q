@@ -3,8 +3,7 @@ name: Build 1Q APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -25,12 +24,29 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Use Android SDK already installed on GitHub runner
-      - name: Install Android SDK components
+      - name: Locate Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          yes | sdkmanager --licenses || true
-          sdkmanager --install \
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+
+          SDKMANAGER=$(find "$SDK_ROOT" \
+            -type f -name sdkmanager 2>/dev/null | head -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            find /usr/local/lib/android -maxdepth 5 -type f \
+              -name sdkmanager 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Install Android SDK packages
+        run: |
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" --install \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "platform-tools"
@@ -40,7 +56,7 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build 1Q Release APK
+      - name: Build 1Q APK
         working-directory: 1Q-android
         run: gradle :app:assembleRelease --no-daemon
 
