@@ -1,0 +1,64 @@
+
+name: Build 1Q APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Download repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Extract Android project
+      - name: Extract Android project
+        run: unzip -q 1Q-android.zip
+
+      # 3. Configure Java
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 4. Configure Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager "platforms;android-34"
+          sdkmanager "build-tools;34.0.0"
+
+      # 5. Configure Gradle
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # 6. Build release APK
+      - name: Build 1Q APK
+        working-directory: 1Q-android
+        run: gradle :app:assembleRelease --no-daemon
+
+      # 7. Rename APK
+      - name: Prepare APK
+        run: |
+          cp 1Q-android/app/build/outputs/apk/release/app-release.apk 1Q.apk
+
+      # 8. Upload APK
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 1Q-apk
+          path: 1Q.apk
+          if-no-files-found: error
+          retention-days: 14
+          
