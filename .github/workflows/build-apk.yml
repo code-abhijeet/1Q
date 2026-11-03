@@ -3,8 +3,8 @@
 # Where to put this file in your "1q" repository:
 #     .github/workflows/build-apk.yml
 #
-# Works whether the Android project is at the repository root or in a
-# sub-folder such as 1Q-android/. Only public sources are used
+# Works whether you uploaded 1Q-android.zip itself, its contents at the
+# repository root, or the 1Q-android/ folder. Only public sources are used
 # (Google Maven, Maven Central, services.gradle.org).
 #
 # After a successful run the APK is available:
@@ -34,20 +34,29 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Find the Android project
+      - name: Find the Android project (unzips an uploaded .zip if needed)
         id: project
         shell: bash
         run: |
-          if [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
-            dir="."
-          else
-            found=$(find . -maxdepth 3 \( -name settings.gradle -o -name settings.gradle.kts \) -not -path "./.git/*" | head -n 1)
-            if [ -z "$found" ]; then
-              echo "::error::No settings.gradle found. Upload the contents of the 1Q-android folder to the repository."
-              exit 1
+          find_settings() {
+            find . -maxdepth 4 \( -name settings.gradle -o -name settings.gradle.kts \) \
+              -not -path "./.git/*" -not -path "./_unzipped/*/.git/*" | head -n 1
+          }
+          found=$(find_settings)
+          if [ -z "$found" ]; then
+            zip=$(find . -maxdepth 2 -iname "*.zip" -not -path "./.git/*" | head -n 1)
+            if [ -n "$zip" ]; then
+              echo "Unpacking $zip"
+              mkdir -p _unzipped
+              unzip -q -o "$zip" -d _unzipped
+              found=$(find_settings)
             fi
-            dir=$(dirname "$found")
           fi
+          if [ -z "$found" ]; then
+            echo "::error::No Android project found. Upload 1Q-android.zip (or its contents) to the repository."
+            exit 1
+          fi
+          dir=$(dirname "$found")
           echo "Android project: $dir"
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
