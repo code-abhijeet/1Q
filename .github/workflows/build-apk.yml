@@ -66,12 +66,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK 34
+      - name: Install Android SDK 34
         shell: bash
-        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+        run: |
+          # GitHub's Ubuntu runners already include the Android SDK; just add what 1Q needs.
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKM=""
+          for c in "$SDK"/cmdline-tools/latest/bin/sdkmanager "$SDK"/cmdline-tools/*/bin/sdkmanager; do
+            if [ -x "$c" ]; then SDKM="$c"; break; fi
+          done
+          if [ -z "$SDKM" ]; then
+            echo "::error::sdkmanager not found under $SDK"
+            exit 1
+          fi
+          echo "Using $SDKM"
+          yes | "$SDKM" --sdk_root="$SDK" --licenses > /dev/null || true
+          "$SDKM" --sdk_root="$SDK" --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
